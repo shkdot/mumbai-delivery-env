@@ -1,0 +1,124 @@
+name: mumbai-delivery-env
+version: 1.0.0
+description: >
+  A real-world delivery optimization environment based on the Mumbai road network
+  (Andheri-Malad-Powai zone, 15km radius). An RL agent must pick up and deliver
+  packages across real Mumbai locations using actual road distances fetched from OSRM.
+  Tasks range from simple 2-package local delivery to complex 6-package cross-city routing.
+
+author: your-huggingface-username
+license: MIT
+tags:
+  - delivery
+  - routing
+  - optimization
+  - mumbai
+  - real-world
+  - logistics
+
+environment:
+  type: openenv
+  entry_point: server.app:app
+  reset_endpoint: /reset
+  step_endpoint: /step
+  state_endpoint: /state
+  tasks_endpoint: /tasks
+  grader_endpoint: /grader
+  baseline_endpoint: /baseline
+
+observation_space:
+  current_location:
+    type: string
+    description: Name of the location where the agent currently is
+  undelivered_packages:
+    type: list[string]
+    description: List of delivery destinations not yet completed
+  delivered_packages:
+    type: list[string]
+    description: List of successfully delivered destinations
+  distance_travelled_km:
+    type: float
+    description: Total distance covered so far in kilometres
+  time_elapsed_min:
+    type: float
+    description: Total time elapsed in minutes
+  fuel_remaining_L:
+    type: float
+    description: Remaining fuel in litres
+  carrying_packages:
+    type: list[string]
+    description: Packages currently loaded on the vehicle
+  max_carry_capacity:
+    type: integer
+    description: Maximum number of packages the vehicle can carry at once
+
+action_space:
+  action_type:
+    type: string
+    values: [move, pick_up, deliver]
+    description: >
+      move     — travel to a target location (costs fuel and time)
+      pick_up  — pick up a package at current location for a destination
+      deliver  — deliver a carried package at its destination
+  target:
+    type: string
+    description: Location name — must be in the task's location list
+
+tasks:
+  - id: easy
+    name: Local Andheri Delivery
+    difficulty: easy
+    description: Deliver 2 packages in the central Andheri area. Short distances, no time pressure.
+    packages: 2
+    locations: 5
+    max_steps: 20
+    time_limit_min: 60
+    fuel_capacity_L: 10.0
+    score_range: [0.0, 1.0]
+
+  - id: medium
+    name: Andheri-Jogeshwari Multi-Stop
+    difficulty: medium
+    description: Deliver 4 packages across Andheri and Jogeshwari. Fuel management required.
+    packages: 4
+    locations: 8
+    max_steps: 40
+    time_limit_min: 120
+    fuel_capacity_L: 20.0
+    score_range: [0.0, 1.0]
+
+  - id: hard
+    name: Mumbai Full Zone Delivery
+    difficulty: hard
+    description: Deliver 6 packages across full 15km Mumbai zone. Tight time windows and fuel constraints.
+    packages: 6
+    locations: 15
+    max_steps: 60
+    time_limit_min: 180
+    fuel_capacity_L: 30.0
+    score_range: [0.0, 1.0]
+
+reward:
+  type: shaped
+  description: >
+    Partial rewards throughout the episode — not just at the end.
+    +10 to +15 per successful delivery (with time bonus)
+    +20 bonus for completing all deliveries
+    -0.1 per km travelled (efficiency penalty)
+    +0.5 bonus per step when carrying packages (productive movement)
+    -2 to -3 for invalid actions
+    -10 for running out of fuel (episode ends)
+
+grading:
+  method: weighted
+  weights:
+    delivery_completion: 0.70
+    fuel_efficiency: 0.15
+    time_efficiency: 0.15
+  output_range: [0.0, 1.0]
+  deterministic: true
+
+docker:
+  base_image: python:3.11-slim
+  port: 7860
+  startup_command: uvicorn server.app:app --host 0.0.0.0 --port 7860
