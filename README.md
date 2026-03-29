@@ -1,5 +1,3 @@
-# 🚚 Mumbai Delivery RL Environment
-
 ---
 title: Mumbai Delivery RL Environment
 emoji: 🚚
@@ -8,6 +6,8 @@ colorTo: green
 sdk: docker
 pinned: false
 ---
+
+# 🚚 Mumbai Delivery RL Environment
 
 A real-world delivery optimization environment built for the OpenEnv Hackathon.
 An RL agent must pick up and deliver packages across real Mumbai locations using
