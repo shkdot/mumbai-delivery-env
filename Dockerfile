@@ -22,14 +22,3 @@ EXPOSE 7860
 
 # Start the server
 CMD ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860"]
-```
-
----
-
-Now open `server/requirements.txt`, delete everything and paste this:
-```
-fastapi==0.110.0
-uvicorn==0.29.0
-pydantic==2.6.4
-requests==2.31.0
-openai==1.14.0
