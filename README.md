@@ -1,255 +1,188 @@
+# 🚚 Mumbai Delivery RL Environment
+
 ---
-title: My Hackathon Env Environment Server
-emoji: 🏐
-colorFrom: yellow
-colorTo: gray
+title: Mumbai Delivery RL Environment
+emoji: 🚚
+colorFrom: blue
+colorTo: green
 sdk: docker
 pinned: false
-app_port: 8000
-base_path: /web
-tags:
-  - openenv
 ---
 
-# My Hackathon Env Environment
+A real-world delivery optimization environment built for the OpenEnv Hackathon.
+An RL agent must pick up and deliver packages across real Mumbai locations using
+actual road distances and durations fetched from OSRM (Open Source Routing Machine).
 
-A simple test environment that echoes back messages. Perfect for testing the env APIs as well as demonstrating environment usage patterns.
+---
 
-## Quick Start
+## 🗺️ Environment Overview
 
-The simplest way to use the My Hackathon Env environment is through the `MyHackathonEnv` class:
+The environment simulates a delivery agent operating in the **Andheri-Malad-Powai
+zone of Mumbai** (15km radius). Road distances and travel times are based on
+**real Mumbai road network data** — not simulated straight-line distances.
 
-```python
-from my_hackathon_env import MyHackathonAction, MyHackathonEnv
+### Locations Covered
+- Andheri West/East, Jogeshwari, Versova, Lokhandwala
+- Goregaon East, Bangur Nagar, Malad (Inorbit Mall)
+- Powai Lake, IIT Bombay, JVLR Junction
+- Mahakali Caves, Reliance Digital, Decathlon, NESCO Warehouse
 
-try:
-    # Create environment from Docker image
-    my_hackathon_envenv = MyHackathonEnv.from_docker_image("my_hackathon_env-env:latest")
+---
 
-    # Reset
-    result = my_hackathon_envenv.reset()
-    print(f"Reset: {result.observation.echoed_message}")
+## 🎯 Tasks
 
-    # Send multiple messages
-    messages = ["Hello, World!", "Testing echo", "Final message"]
+| Task | Difficulty | Packages | Locations | Time Limit | Fuel |
+|------|------------|----------|-----------|------------|------|
+| easy | Easy | 2 | 5 | 60 min | 10L |
+| medium | Medium | 4 | 8 | 120 min | 20L |
+| hard | Hard | 6 | 15 | 180 min | 30L |
 
-    for msg in messages:
-        result = my_hackathon_envenv.step(MyHackathonAction(message=msg))
-        print(f"Sent: '{msg}'")
-        print(f"  → Echoed: '{result.observation.echoed_message}'")
-        print(f"  → Length: {result.observation.message_length}")
-        print(f"  → Reward: {result.reward}")
+---
 
-finally:
-    # Always clean up
-    my_hackathon_envenv.close()
+## 🔁 Action Space
+
+| Action | Description |
+|--------|-------------|
+| `move` | Travel to a target location (costs fuel + time) |
+| `pick_up` | Pick up a package at current location |
+| `deliver` | Deliver a carried package at its destination |
+```json
+{"action_type": "move", "target": "Andheri_Station"}
+{"action_type": "pick_up", "target": "Mahakali_Caves"}
+{"action_type": "deliver", "target": "Powai_Lake"}
 ```
 
-That's it! The `MyHackathonEnv.from_docker_image()` method handles:
-- Starting the Docker container
-- Waiting for the server to be ready
-- Connecting to the environment
-- Container cleanup when you call `close()`
+---
 
-## Building the Docker Image
+## 👁️ Observation Space
 
-Before using the environment, you need to build the Docker image:
+| Field | Type | Description |
+|-------|------|-------------|
+| `current_location` | string | Agent's current location |
+| `undelivered_packages` | list[string] | Pending delivery destinations |
+| `delivered_packages` | list[string] | Completed deliveries |
+| `distance_travelled_km` | float | Total km covered |
+| `time_elapsed_min` | float | Total time elapsed |
+| `fuel_remaining_L` | float | Remaining fuel |
+| `carrying_packages` | list[string] | Packages on vehicle |
+| `max_carry_capacity` | int | Max packages vehicle can carry |
 
-```bash
-# From project root
-docker build -t my_hackathon_env-env:latest -f server/Dockerfile .
-```
+---
 
-## Deploying to Hugging Face Spaces
+## 🏆 Reward System
 
-You can easily deploy your OpenEnv environment to Hugging Face Spaces using the `openenv push` command:
+| Event | Reward |
+|-------|--------|
+| Successful delivery | +10 to +15 (with time bonus) |
+| All deliveries complete | +20 bonus |
+| Moving (per km) | -0.1 |
+| Carrying packages while moving | +0.5 |
+| Invalid action | -2 |
+| Wrong delivery location | -3 |
+| Out of fuel | -10 (episode ends) |
 
-```bash
-# From the environment directory (where openenv.yaml is located)
-openenv push
+---
 
-# Or specify options
-openenv push --namespace my-org --private
-```
+## 📊 Grading
 
-The `openenv push` command will:
-1. Validate that the directory is an OpenEnv environment (checks for `openenv.yaml`)
-2. Prepare a custom build for Hugging Face Docker space (enables web interface)
-3. Upload to Hugging Face (ensuring you're logged in)
+Scores range from **0.0 to 1.0**:
+
+| Component | Weight |
+|-----------|--------|
+| Delivery completion | 70% |
+| Fuel efficiency | 15% |
+| Time efficiency | 15% |
+
+---
+
+## 🚀 Setup & Running Locally
 
 ### Prerequisites
+- Python 3.10+
+- Git
+- Docker (optional)
 
-- Authenticate with Hugging Face: The command will prompt for login if not already authenticated
-
-### Options
-
-- `--directory`, `-d`: Directory containing the OpenEnv environment (defaults to current directory)
-- `--repo-id`, `-r`: Repository ID in format 'username/repo-name' (defaults to 'username/env-name' from openenv.yaml)
-- `--base-image`, `-b`: Base Docker image to use (overrides Dockerfile FROM)
-- `--private`: Deploy the space as private (default: public)
-
-### Examples
-
+### Install & Run
 ```bash
-# Push to your personal namespace (defaults to username/env-name from openenv.yaml)
-openenv push
+# Clone the repo
+git clone https://huggingface.co/spaces/your-username/mumbai-delivery-env
+cd mumbai-delivery-env
 
-# Push to a specific repository
-openenv push --repo-id my-org/my-env
+# Install dependencies
+pip install -r server/requirements.txt
 
-# Push with a custom base image
-openenv push --base-image ghcr.io/meta-pytorch/openenv-base:latest
-
-# Push as a private space
-openenv push --private
-
-# Combine options
-openenv push --repo-id my-org/my-env --base-image custom-base:latest --private
+# Start the server
+uvicorn server.app:app --host 0.0.0.0 --port 7860
 ```
 
-After deployment, your space will be available at:
-`https://huggingface.co/spaces/<repo-id>`
-
-The deployed space includes:
-- **Web Interface** at `/web` - Interactive UI for exploring the environment
-- **API Documentation** at `/docs` - Full OpenAPI/Swagger interface
-- **Health Check** at `/health` - Container health monitoring
-- **WebSocket** at `/ws` - Persistent session endpoint for low-latency interactions
-
-## Environment Details
-
-### Action
-**MyHackathonAction**: Contains a single field
-- `message` (str) - The message to echo back
-
-### Observation
-**MyHackathonObservation**: Contains the echo response and metadata
-- `echoed_message` (str) - The message echoed back
-- `message_length` (int) - Length of the message
-- `reward` (float) - Reward based on message length (length × 0.1)
-- `done` (bool) - Always False for echo environment
-- `metadata` (dict) - Additional info like step count
-
-### Reward
-The reward is calculated as: `message_length × 0.1`
-- "Hi" → reward: 0.2
-- "Hello, World!" → reward: 1.3
-- Empty message → reward: 0.0
-
-## Advanced Usage
-
-### Connecting to an Existing Server
-
-If you already have a My Hackathon Env environment server running, you can connect directly:
-
-```python
-from my_hackathon_env import MyHackathonEnv
-
-# Connect to existing server
-my_hackathon_envenv = MyHackathonEnv(base_url="<ENV_HTTP_URL_HERE>")
-
-# Use as normal
-result = my_hackathon_envenv.reset()
-result = my_hackathon_envenv.step(MyHackathonAction(message="Hello!"))
-```
-
-Note: When connecting to an existing server, `my_hackathon_envenv.close()` will NOT stop the server.
-
-### Using the Context Manager
-
-The client supports context manager usage for automatic connection management:
-
-```python
-from my_hackathon_env import MyHackathonAction, MyHackathonEnv
-
-# Connect with context manager (auto-connects and closes)
-with MyHackathonEnv(base_url="http://localhost:8000") as env:
-    result = env.reset()
-    print(f"Reset: {result.observation.echoed_message}")
-    # Multiple steps with low latency
-    for msg in ["Hello", "World", "!"]:
-        result = env.step(MyHackathonAction(message=msg))
-        print(f"Echoed: {result.observation.echoed_message}")
-```
-
-The client uses WebSocket connections for:
-- **Lower latency**: No HTTP connection overhead per request
-- **Persistent session**: Server maintains your environment state
-- **Efficient for episodes**: Better for many sequential steps
-
-### Concurrent WebSocket Sessions
-
-The server supports multiple concurrent WebSocket connections. To enable this,
-modify `server/app.py` to use factory mode:
-
-```python
-# In server/app.py - use factory mode for concurrent sessions
-app = create_app(
-    MyHackathonEnvironment,  # Pass class, not instance
-    MyHackathonAction,
-    MyHackathonObservation,
-    max_concurrent_envs=4,  # Allow 4 concurrent sessions
-)
-```
-
-Then multiple clients can connect simultaneously:
-
-```python
-from my_hackathon_env import MyHackathonAction, MyHackathonEnv
-from concurrent.futures import ThreadPoolExecutor
-
-def run_episode(client_id: int):
-    with MyHackathonEnv(base_url="http://localhost:8000") as env:
-        result = env.reset()
-        for i in range(10):
-            result = env.step(MyHackathonAction(message=f"Client {client_id}, step {i}"))
-        return client_id, result.observation.message_length
-
-# Run 4 episodes concurrently
-with ThreadPoolExecutor(max_workers=4) as executor:
-    results = list(executor.map(run_episode, range(4)))
-```
-
-## Development & Testing
-
-### Direct Environment Testing
-
-Test the environment logic directly without starting the HTTP server:
-
+### Run with Docker
 ```bash
-# From the server directory
-python3 server/my_hackathon_env_environment.py
+docker build -t mumbai-delivery-env .
+docker run -p 7860:7860 mumbai-delivery-env
 ```
 
-This verifies that:
-- Environment resets correctly
-- Step executes actions properly
-- State tracking works
-- Rewards are calculated correctly
+---
 
-### Running Locally
+## 🔌 API Endpoints
 
-Run the server locally for development:
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/` | GET | Environment info |
+| `/tasks` | GET | List all tasks + action schema |
+| `/reset?task_id=easy` | POST | Reset environment |
+| `/state?task_id=easy` | GET | Get current state |
+| `/step?task_id=easy` | POST | Take an action |
+| `/grader?task_id=easy` | GET | Get episode score |
+| `/baseline` | GET | Run greedy baseline on all tasks |
 
+---
+
+## 🤖 Running the Baseline Agent
 ```bash
-uvicorn server.app:app --reload
+# Greedy baseline (no API key needed)
+python client.py
+
+# LLM agent (requires OpenAI API key)
+export OPENAI_API_KEY=your-key-here
+python client.py
 ```
 
-## Project Structure
+---
 
+## 📁 Project Structure
 ```
-my_hackathon_env/
-├── .dockerignore         # Docker build exclusions
-├── __init__.py            # Module exports
-├── README.md              # This file
-├── openenv.yaml           # OpenEnv manifest
-├── pyproject.toml         # Project metadata and dependencies
-├── uv.lock                # Locked dependencies (generated)
-├── client.py              # MyHackathonEnv client
-├── models.py              # Action and Observation models
-└── server/
-    ├── __init__.py        # Server module exports
-    ├── my_hackathon_env_environment.py  # Core environment logic
-    ├── app.py             # FastAPI application (HTTP + WebSocket endpoints)
-    └── Dockerfile         # Container image definition
+mumbai-delivery-env/
+├── server/
+│   ├── __init__.py
+│   ├── app.py                        # FastAPI server + endpoints
+│   ├── models.py                     # Pydantic typed models
+│   ├── my_hackathon_env_environment.py  # Core RL environment
+│   └── requirements.txt
+├── distance_matrix.json              # Real Mumbai road distances (OSRM)
+├── client.py                         # Baseline inference script
+├── Dockerfile
+├── openenv.yaml                      # OpenEnv spec
+├── pyproject.toml
+└── README.md
 ```
+
+---
+
+## 🌍 Real-World Data
+
+Road distances are sourced from **OSRM (Open Source Routing Machine)**
+using OpenStreetMap data. All 225 location pairs (15×15) have been
+pre-fetched and stored in `distance_matrix.json` for reproducible,
+offline evaluation.
+
+---
+
+## 📍 Map Coverage
+
+**Center:** Andheri, Mumbai
+**Radius:** ~15km
+**Boundaries:**
+- North: Malad / Inorbit Mall
+- South: Santacruz / Andheri East
+- West: Versova Beach
+- East: Powai Lake / IIT Bombay
