@@ -2,7 +2,7 @@ import os
 import requests
 import sys
 
-BASE_URL = os.getenv("OPENENV_BASE_URL", "http://localhost:7860")
+BASE_URL = os.getenv("API_BASE_URL") or os.getenv("OPENENV_BASE_URL") or "http://localhost:7860"
 
 
 def greedy_action(obs: dict):
@@ -28,8 +28,7 @@ def greedy_action(obs: dict):
     if undelivered and len(carrying) < capacity:
         next_pkg = undelivered[0]
         wh = next(
-            (w for w in warehouses
-             if w["name"] == next_pkg["warehouse"]),
+            (w for w in warehouses if w["name"] == next_pkg["warehouse"]),
             warehouses[0]
         )
         wh_loc = wh["location"]
@@ -44,15 +43,12 @@ def greedy_action(obs: dict):
 
 
 def run_inference(task_id: str):
-    # Reset
-    r = requests.post(
-        f"{BASE_URL}/reset",
-        params={"task_id": task_id}
-    )
+    r = requests.post(f"{BASE_URL}/reset", params={"task_id": task_id})
+    r.raise_for_status()
     obs = r.json()["observation"]
+
     done = False
     step_count = 0
-    total_reward = 0.0
 
     print(f"[START] task={task_id}", flush=True)
 
@@ -66,38 +62,24 @@ def run_inference(task_id: str):
             params={"task_id": task_id},
             json=action
         )
+        r.raise_for_status()
+
         data = r.json()
         obs = data["observation"]
         done = data["done"]
         reward = data["reward"]["value"]
-        total_reward += reward
         step_count += 1
 
-        print(
-            f"[STEP] step={step_count} "
-            f"action={action['action_type']} "
-            f"target={action['target']} "
-            f"reward={reward}",
-            flush=True
-        )
+        print(f"[STEP] step={step_count} reward={reward}", flush=True)
 
-    # Grade
-    r = requests.get(
-        f"{BASE_URL}/grader",
-        params={"task_id": task_id}
-    )
+    r = requests.get(f"{BASE_URL}/grader", params={"task_id": task_id})
+    r.raise_for_status()
     result = r.json()
 
     print(
-        f"[END] task={task_id} "
-        f"score={result['score']} "
-        f"steps={step_count} "
-        f"deliveries={result['deliveries_completed']}/"
-        f"{result['total_deliveries']}",
+        f"[END] task={task_id} score={result['score']} steps={step_count}",
         flush=True
     )
-
-    return result
 
 
 if __name__ == "__main__":
