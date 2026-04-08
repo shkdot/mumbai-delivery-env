@@ -1,37 +1,8 @@
 import os
 import requests
+import sys
 
 BASE_URL = os.getenv("OPENENV_BASE_URL", "http://localhost:7860")
-
-
-def run_inference(task_id: str) -> dict:
-    # Reset
-    r = requests.post(
-        f"{BASE_URL}/reset",
-        params={"task_id": task_id}
-    )
-    obs = r.json()["observation"]
-    done = False
-
-    while not done:
-        action = greedy_action(obs)
-        if action is None:
-            break
-        r = requests.post(
-            f"{BASE_URL}/step",
-            params={"task_id": task_id},
-            json=action
-        )
-        data = r.json()
-        obs = data["observation"]
-        done = data["done"]
-
-    # Grade
-    r = requests.get(
-        f"{BASE_URL}/grader",
-        params={"task_id": task_id}
-    )
-    return r.json()
 
 
 def greedy_action(obs: dict):
@@ -72,11 +43,63 @@ def greedy_action(obs: dict):
     return None
 
 
-if __name__ == "__main__":
-    scores = {}
-    for task_id in ["easy", "medium", "hard"]:
-        result = run_inference(task_id)
-        scores[task_id] = result["score"]
-        print(f"{task_id}: {result['score']}")
+def run_inference(task_id: str):
+    # Reset
+    r = requests.post(
+        f"{BASE_URL}/reset",
+        params={"task_id": task_id}
+    )
+    obs = r.json()["observation"]
+    done = False
+    step_count = 0
+    total_reward = 0.0
 
-    print(f"\nAverage: {sum(scores.values()) / len(scores):.4f}")
+    print(f"[START] task={task_id}", flush=True)
+
+    while not done:
+        action = greedy_action(obs)
+        if action is None:
+            break
+
+        r = requests.post(
+            f"{BASE_URL}/step",
+            params={"task_id": task_id},
+            json=action
+        )
+        data = r.json()
+        obs = data["observation"]
+        done = data["done"]
+        reward = data["reward"]["value"]
+        total_reward += reward
+        step_count += 1
+
+        print(
+            f"[STEP] step={step_count} "
+            f"action={action['action_type']} "
+            f"target={action['target']} "
+            f"reward={reward}",
+            flush=True
+        )
+
+    # Grade
+    r = requests.get(
+        f"{BASE_URL}/grader",
+        params={"task_id": task_id}
+    )
+    result = r.json()
+
+    print(
+        f"[END] task={task_id} "
+        f"score={result['score']} "
+        f"steps={step_count} "
+        f"deliveries={result['deliveries_completed']}/"
+        f"{result['total_deliveries']}",
+        flush=True
+    )
+
+    return result
+
+
+if __name__ == "__main__":
+    for task_id in ["easy", "medium", "hard"]:
+        run_inference(task_id)
